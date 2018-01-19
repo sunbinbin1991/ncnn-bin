@@ -64,9 +64,9 @@ static int detect_squeezenet(const cv::Mat& bgr, std::vector<float>& cls_scores)
 	//cv:: Mat face_gray, face_3channels;
 	//ncnn::Mat in = ncnn::Mat::from_pixels(in_s.data, ncnn::Mat::PIXEL_RGBA2BGR, width, height);
 	//cvtColor(face_gray, face_3channels, COLOR_GRAY2BGR);
+	
 	ncnn::Mat in = ncnn::Mat::from_pixels_resize(bgr.data, ncnn::Mat::PIXEL_BGR2GRAY, bgr.cols, bgr.rows, width, height);
 	
-
 	//const float mean_vals[3] = {0.f, 0.f, 0.f};
 	//const float mean_vals[3] = {104.f, 117.f, 123.f};
 	//const float mean_vals[3] = { 123, 117.f, 104.f };
@@ -148,7 +148,7 @@ static int print_topk(const std::vector<float>& cls_scores, int topk)
 
 int main(int argc, char** argv)
 {
-
+	
 	std::string path  = "./data/Path5.txt";
 	std::ifstream infile;
 	infile.open(path.data());   //将文件流对象与文件连接起来 
@@ -161,21 +161,8 @@ int main(int argc, char** argv)
 		std::cout << s << std::endl;
 		std::string imagepath = s;
 		cv::Mat face = cv::imread(imagepath, CV_LOAD_IMAGE_COLOR);
-		//for (int h = 0; h < face.rows; h++) {
-		//	for (int w = 0; w < face.cols; w++) {
-		//		int pixel_1 = face.at<cv::Vec3b>(h, w)[0];
-		//		int pixel_2 = face.at<cv::Vec3b>(h, w)[0];
-		//		int pixel_3 = face.at<cv::Vec3b>(h, w)[0];
-		//		fprintf(stderr, "%d %d %d \n", pixel_1, pixel_2, pixel_3
-		//	}
-		//}
 		cv::Mat face_gray, face_3channels;
-		//cv::imshow("img", face);
-		//cvWaitKey(10);
-		//cv::cvtColor(face, face_gray, cv::COLOR_BGR2GRAY);
-		//cv::cvtColor(face_gray, face_3channels, cv::COLOR_GRAY2BGR);
 		face_3channels = face;
-		//cv::resize(face, face_3channels, cv::Size(192, 192));
 		if (face_3channels.empty())
 		{
 			fprintf(stderr, "cv::imread %s failed\n", imagepath);
