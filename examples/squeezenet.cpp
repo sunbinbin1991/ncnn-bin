@@ -24,8 +24,32 @@
 
 #include <iostream> 
 #include <fstream> 
-#include <Windows.h>  
+#include <Windows.h> 
+#include<filesystem>
+
 using namespace zz;
+
+using namespace std;
+
+namespace filesystem = experimental::filesystem;
+
+vector<pair<string, string>> load_facedb(const string& root_dir) {
+	vector<pair<string, string>> facedb;
+	if (!root_dir.empty())
+	{
+		filesystem::path apk_path(root_dir);
+		filesystem::recursive_directory_iterator end;
+
+		for (filesystem::recursive_directory_iterator i(apk_path); i != end; ++i)
+		{
+			if (filesystem::is_regular_file(i->path())) {
+				const filesystem::path cp = (*i);
+				facedb.push_back(make_pair(cp.filename().string(), cp.string()));
+			}
+		}
+	}
+	return facedb;
+};
 
 
 inline int argmax(const std::vector<float>& arr) {
@@ -54,24 +78,24 @@ void readTxt(std::string file)
 static int detect_squeezenet(const cv::Mat& bgr, std::vector<float>& cls_scores)
 {
     ncnn::Net squeezenet;
-    squeezenet.load_param("D:/tools/ncnn2/ncnn/build/examples/model/ncnndong.param");
-    squeezenet.load_model("D:/tools/ncnn2/ncnn/build/examples/model/ncnndong.bin");
+    squeezenet.load_param("D:/tools/ncnn2/ncnn/build/examples/model/ncnn.param");
+    squeezenet.load_model("D:/tools/ncnn2/ncnn/build/examples/model/ncnn.bin");
 
 	int width = 128;
 	int height = 128;
     //ncnn::Mat in = ncnn::Mat::from_pixels_resize(bgr.data, ncnn::Mat::PIXEL_BGR, bgr.cols, bgr.rows, width, height);
 	//ncnn::Mat::PIXEL_RGBA2BGR
 	//cv:: Mat face_gray, face_3channels;
-	//ncnn::Mat in = ncnn::Mat::from_pixels(in_s.data, ncnn::Mat::PIXEL_RGBA2BGR, width, height);
+	//ncnn::Mat in = ncnn::Mat::from_pixels(bgr.data, ncnn::Mat::PIXEL_BGR2GRAY, width, height);
 	//cvtColor(face_gray, face_3channels, COLOR_GRAY2BGR);
 	
-	ncnn::Mat in = ncnn::Mat::from_pixels_resize(bgr.data, ncnn::Mat::PIXEL_BGR2GRAY, bgr.cols, bgr.rows, width, height);
+	ncnn::Mat in = ncnn::Mat::from_pixels_resize(bgr.data, ncnn::Mat::PIXEL_GRAY, bgr.cols, bgr.rows, width, height);
 	
 	//const float mean_vals[3] = {0.f, 0.f, 0.f};
 	//const float mean_vals[3] = {104.f, 117.f, 123.f};
 	//const float mean_vals[3] = { 123, 117.f, 104.f };
 	const float  mean_vals[1] = { 127.5f };
-	const float normal[1] = {0.0078125f};
+	const float normal[1] = { 1.0 / 127.5 };
 
     in.substract_mean_normalize(mean_vals, normal);	
     ncnn::Extractor ex = squeezenet.create_extractor();
@@ -85,7 +109,7 @@ static int detect_squeezenet(const cv::Mat& bgr, std::vector<float>& cls_scores)
 	//ex.extract("global_pool", out);
 	//std::string layer_name = "pooling0";
 	//ex.extract("pooling0", out);
-	ex.extract("cls_prob", out);
+	ex.extract("fc2", out);
     
 	cls_scores.resize(out.c);
 	std::cout << out.c << std::endl;
@@ -114,10 +138,6 @@ static int detect_squeezenet(const cv::Mat& bgr, std::vector<float>& cls_scores)
 	{
 		const float* prob = out.data + out.cstep * j;
 		cls_scores[j] = prob[0];
-
-		//cls_scores[j] = exp(prob[0]) / sum;
-		//std::cout << j <<"==="<< prob[0] << std::endl;
-//		std::cout << j << "part" << cls_scores[j] << std::endl;
 	}
     return 0;
 }
@@ -126,6 +146,9 @@ static int detect_squeezenet(const cv::Mat& bgr, std::vector<float>& cls_scores)
 static int print_topk(const std::vector<float>& cls_scores, int topk)
 {
     // partial sort topk with index
+	 
+
+
     int size = cls_scores.size();
     std::vector< std::pair<float, int> > vec;
     vec.resize(size);
@@ -147,86 +170,63 @@ static int print_topk(const std::vector<float>& cls_scores, int topk)
 }
 
 int main(int argc, char** argv)
-{
-	
-	std::string path  = "./data/Path5.txt";
-	std::ifstream infile;
-	infile.open(path.data());   //将文件流对象与文件连接起来 
-	assert(infile.is_open());   //若失败,则输出错误消息,并终止程序运行 
-	std::string s;
-	int count = 0;
-	while (getline(infile, s))
+{	
+	std::string path  = "./data/adb/alive/";
+	auto testdb = load_facedb(path);
+	for (int i = 0; i < testdb.size(); ++i)
 	{
-		if (infile.eof())  return -1;
-		std::cout << s << std::endl;
-		std::string imagepath = s;
-		cv::Mat face = cv::imread(imagepath, CV_LOAD_IMAGE_COLOR);
-		cv::Mat face_gray, face_3channels;
-		face_3channels = face;
-		if (face_3channels.empty())
+		string test_image_path = testdb[i].first;
+		size_t pos = test_image_path.find("alive");
+		if (pos != string::npos)
 		{
-			fprintf(stderr, "cv::imread %s failed\n", imagepath);
-			return -1;
+			auto src = cv::imread(testdb[i].second);
+			src = cv::imread("chip.jpg");
+			cv::Mat src2;
+			cv::resize(src, src2, cv::Size(128, 128));
+			cv::cvtColor(src2, src2, cv::COLOR_BGR2GRAY);
+			std::vector<float> cls_scores;
+			detect_squeezenet(src2, cls_scores);
+			int label = print_topk(cls_scores, 2);
+
 		}
-		time::Timer timer;
-		std::vector<float> cls_scores;
-		detect_squeezenet(face_3channels, cls_scores);
-		char tmp[32];
-		sprintf(tmp, "%.3f", cls_scores[1]);
-		std::string result_str = std::string("ssss") + "cls_scores= " + tmp;
-		//logger->info("Gender forward elapsed time: ") << timer.to_string();
-		int label = print_topk(cls_scores, 2);
-		cv::imshow("img", face);
-		cv::waitKey(0);
-		if (label == 1) {
-			count++;
-		}
-		//cv::imshow("img", face);
-		//cv::waitKey(0);
-		//system("pause");
-		}	
-	fprintf(stderr, "right = %d", count);
 	}
+	
+	//std::ifstream infile;
+	//infile.open(path.data());   //将文件流对象与文件连接起来 
+	//assert(infile.is_open());   //若失败,则输出错误消息,并终止程序运行 
+	//std::string s;
+	//int count = 0;
+	//while (getline(infile, s))
+	//{
+	//	if (infile.eof())  return -1;
+	//	std::cout << s << std::endl;
+	//	std::string imagepath = s;
+	//	cv::Mat face = cv::imread(imagepath, CV_LOAD_IMAGE_COLOR);
+	//	cv::Mat face_gray, face_3channels;
+	//	face_3channels = face;
+	//	if (face_3channels.empty())
+	//	{
+	//		fprintf(stderr, "cv::imread %s failed\n", imagepath);
+	//		return -1;
+	//	}
+	//	time::Timer timer;
+	//	std::vector<float> cls_scores;
+	//	detect_squeezenet(face_3channels, cls_scores);
+	//	char tmp[32];
+	//	sprintf(tmp, "%.3f", cls_scores[1]);
+	//	std::string result_str = std::string("ssss") + "cls_scores= " + tmp;
+	//	//logger->info("Gender forward elapsed time: ") << timer.to_string();
+	//	int label = print_topk(cls_scores, 2);
+	//	cv::imshow("img", face);
+	//	cv::waitKey(0);
+	//	if (label == 1) {
+	//		count++;
+	//		}
+	//	}	
+	//fprintf(stderr, "right = %d", count);
+}
 
 
-
-	//auto logger = log::get_logger("default");
- //   const char* imagepath = argv[1];
-	////imagepath = "s1.jpg";
-	//imagepath = "data/a6.jpg";
-	//	
- //   cv::Mat face = cv::imread(imagepath, CV_LOAD_IMAGE_COLOR);
-	////for (int h = 0; h < face.rows; h++) {
-	////	for (int w = 0; w < face.cols; w++) {
-	////		int pixel_1 = face.at<cv::Vec3b>(h, w)[0];
-	////		int pixel_2 = face.at<cv::Vec3b>(h, w)[0];
-	////		int pixel_3 = face.at<cv::Vec3b>(h, w)[0];
-
-	////		fprintf(stderr, "%d %d %d \n", pixel_1, pixel_2, pixel_3);
-	////	}
-	////}
-	//cv::Mat face_gray, face_3channels;
-	////cv::imshow("img", face);
-	////cvWaitKey(10);
-	////cv::cvtColor(face, face_gray, cv::COLOR_BGR2GRAY);
-	////cv::cvtColor(face_gray, face_3channels, cv::COLOR_GRAY2BGR);
-	//face_3channels = face;	
-	////cv::resize(face, face_3channels, cv::Size(192, 192));
- //   if (face_3channels.empty())
- //   {
- //       fprintf(stderr, "cv::imread %s failed\n", imagepath);
- //       return -1;
- //   }
-	//time::Timer timer;
- //   std::vector<float> cls_scores;
- //   detect_squeezenet(face_3channels, cls_scores);
-	//char tmp[32];
-	//sprintf(tmp, "%.3f", cls_scores[1]);
-	//std::string result_str = std::string("ssss")+"cls_scores= " + tmp;
-	//logger->info("Gender forward elapsed time: ") << timer.to_string();
-	//print_topk(cls_scores, 2);
-	//system("pause");
-//}
 
 //int main()
 //{

@@ -563,10 +563,10 @@ int main()
     //const char* parampath = argv[2];
 	//const char* ncnn_prototxt = argc >= 5 ? argv[3] : "ncnn.proto";
 	//const char* ncnn_modelbin = argc >= 5 ? argv[4] : "ncnn.bin";
-	const char* jsonpath = "./Release/facealive-symbol.json";
-	const char* parampath ="./Release/facealive-0001.params";
-    const char* ncnn_prototxt = "ncnndong.proto";
-    const char* ncnn_modelbin = "ncnndong.bin";
+	const char* jsonpath = "./Release/face-symbol.json";
+	const char* parampath ="./Release/face-0001.params";
+    const char* ncnn_prototxt = "ncnn.param";
+    const char* ncnn_modelbin = "ncnn.bin";
 
     std::vector<MXNetNode> nodes;
     std::vector<MXNetParam> params;
@@ -938,7 +938,8 @@ int main()
 			std::string type = n.attr("act_type");
             if (type == "elu")
             {
-            }
+
+			}
             else if (type == "leaky")
             {
             }
